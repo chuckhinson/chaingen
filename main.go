@@ -19,7 +19,7 @@ func main() {
 		panic(err)
 	}
 
-	chain, err := makeCertChain(serverKey.PublicKey)
+	chain, err := makeCertChain("test.example.com", serverKey.PublicKey)
 	if err != nil {
 		panic(err)
 	}
@@ -31,7 +31,7 @@ func main() {
 
 }
 
-func makeCertChain(serverKey rsa.PublicKey) (chain [][]byte, err error) {
+func makeCertChain(serverName string, serverKey rsa.PublicKey) (chain [][]byte, err error) {
 
 	rootCa, rootCaKey, err := makeRootCaCertificate()
 	if err != nil {
@@ -43,7 +43,7 @@ func makeCertChain(serverKey rsa.PublicKey) (chain [][]byte, err error) {
 		return nil, err
 	}
 
-	serverCert, err := makeServerCertificate(intCa, intCaKey, serverKey)
+	serverCert, err := makeServerCertificate(intCa, intCaKey, serverName, serverKey)
 	if err != nil {
 		return nil, err
 	}
@@ -183,7 +183,7 @@ func makeIntCaCertificate(rootCaCert []byte, rootCaPrivKey *rsa.PrivateKey) ([]b
 
 }
 
-func makeServerCertificate(caCert []byte, caPrivKey *rsa.PrivateKey, serverKey rsa.PublicKey) ([]byte, error) {
+func makeServerCertificate(caCert []byte, caPrivKey *rsa.PrivateKey, serverName string, serverKey rsa.PublicKey) ([]byte, error) {
 
 	caCertTemplate, err := x509.ParseCertificate(caCert)
 	if err != nil {
@@ -194,7 +194,7 @@ func makeServerCertificate(caCert []byte, caPrivKey *rsa.PrivateKey, serverKey r
 	serverCertTemplate := &x509.Certificate{
 		SerialNumber: big.NewInt(2019),
 		Subject: pkix.Name{
-			CommonName: "test.example.org",
+			CommonName: serverName,
 		},
 		NotBefore:    time.Now(),
 		NotAfter:     time.Now().AddDate(10, 0, 0),
