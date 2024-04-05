@@ -14,38 +14,17 @@ import (
 
 func main() {
 
-	serverPrivKey, err := rsa.GenerateKey(rand.Reader, 4096)
+	serverKey, err := rsa.GenerateKey(rand.Reader, 4096)
 	if err != nil {
 		panic(err)
 	}
 
-	chain, err := makeCertChain(serverPrivKey.PublicKey)
+	chain, err := makeCertChain(serverKey.PublicKey)
 	if err != nil {
 		panic(err)
 	}
 
-	rootCaPEM, err := writeCertPEM(chain[0], "/tmp/capublic.pem")
-	if err != nil {
-		panic(err)
-	}
-
-	intCaPEM, err := writeCertPEM(chain[1], "/tmp/intpublic.pem")
-	if err != nil {
-		panic(err)
-	}
-
-	_, err = writeCertPEM(chain[2], "/tmp/serverpublic.pem")
-	if err != nil {
-		panic(err)
-	}
-
-	err = writeKeyPEM(serverPrivKey, "/tmp/serverkey.pem")
-	if err != nil {
-		panic(err)
-	}
-
-	s := [][]byte{rootCaPEM.Bytes(), intCaPEM.Bytes()}
-	err = os.WriteFile("/tmp/cabundle.pem", bytes.Join(s, []byte("\n")), 0644)
+	err = writePEMFiles(chain, serverKey)
 	if err != nil {
 		panic(err)
 	}
@@ -71,6 +50,37 @@ func makeCertChain(serverKey rsa.PublicKey) (chain [][]byte, err error) {
 
 	return [][]byte{rootCa, intCa, serverCert}, nil
 
+}
+
+func writePEMFiles(chain [][]byte, key *rsa.PrivateKey) error {
+
+	rootCaPEM, err := writeCertPEM(chain[0], "/tmp/capublic.pem")
+	if err != nil {
+		return (err)
+	}
+
+	intCaPEM, err := writeCertPEM(chain[1], "/tmp/intpublic.pem")
+	if err != nil {
+		return (err)
+	}
+
+	_, err = writeCertPEM(chain[2], "/tmp/serverpublic.pem")
+	if err != nil {
+		return (err)
+	}
+
+	err = writeKeyPEM(key, "/tmp/serverkey.pem")
+	if err != nil {
+		return (err)
+	}
+
+	s := [][]byte{rootCaPEM.Bytes(), intCaPEM.Bytes()}
+	err = os.WriteFile("/tmp/cabundle.pem", bytes.Join(s, []byte("\n")), 0644)
+	if err != nil {
+		panic(err)
+	}
+
+	return nil
 }
 
 func writeKeyPEM(privateKey *rsa.PrivateKey, filename string) error {
