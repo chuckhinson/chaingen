@@ -8,9 +8,10 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"flag"
-	"fmt"
 	"math/big"
 	"os"
+	"regexp"
+	"strings"
 	"time"
 )
 
@@ -20,7 +21,9 @@ func main() {
 	flag.StringVar(&serverName, "host", "test.example.com", "hostname for certificate")
 	flag.Parse()
 
-	fmt.Println("host:", serverName)
+	if !isValidDomain(serverName) {
+		panic("host name is not a valid name")
+	}
 
 	serverKey, err := rsa.GenerateKey(rand.Reader, 4096)
 	if err != nil {
@@ -32,11 +35,21 @@ func main() {
 		panic(err)
 	}
 
-	err = writePEMFiles(chain, serverKey)
+	prefix := strings.ToLower(serverName)
+	prefix = strings.Replace(serverName, "*", "STAR", 1)
+	prefix = strings.ReplaceAll(prefix, ".", "_")
+	err = writePEMFiles(chain, serverKey, prefix)
 	if err != nil {
 		panic(err)
 	}
 
+}
+
+// isValidDomain checks for valid domain name, including wildcard domains
+func isValidDomain(domain string) bool {
+	regex := `^(\*\.)?(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$`
+	match, _ := regexp.MatchString(regex, domain)
+	return match
 }
 
 func makeCertChain(serverName string, serverKey rsa.PublicKey) (chain [][]byte, err error) {
@@ -60,30 +73,30 @@ func makeCertChain(serverName string, serverKey rsa.PublicKey) (chain [][]byte, 
 
 }
 
-func writePEMFiles(chain [][]byte, key *rsa.PrivateKey) error {
+func writePEMFiles(chain [][]byte, key *rsa.PrivateKey, prefix string) error {
 
-	rootCaPEM, err := writeCertPEM(chain[0], "/tmp/capublic.pem")
+	rootCaPEM, err := writeCertPEM(chain[0], "capublic.pem")
 	if err != nil {
 		return (err)
 	}
 
-	intCaPEM, err := writeCertPEM(chain[1], "/tmp/intpublic.pem")
+	intCaPEM, err := writeCertPEM(chain[1], "intpublic.pem")
 	if err != nil {
 		return (err)
 	}
 
-	_, err = writeCertPEM(chain[2], "/tmp/serverpublic.pem")
+	_, err = writeCertPEM(chain[2], prefix+".crt")
 	if err != nil {
 		return (err)
 	}
 
-	err = writeKeyPEM(key, "/tmp/serverkey.pem")
+	err = writeKeyPEM(key, prefix+".key")
 	if err != nil {
 		return (err)
 	}
 
 	s := [][]byte{rootCaPEM.Bytes(), intCaPEM.Bytes()}
-	err = os.WriteFile("/tmp/cabundle.pem", bytes.Join(s, []byte("\n")), 0644)
+	err = os.WriteFile(prefix+".ca-bundle", bytes.Join(s, []byte("\n")), 0644)
 	if err != nil {
 		panic(err)
 	}

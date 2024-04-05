@@ -22,3 +22,9 @@ go.work
 
 # IntelliJ project files
 .idea/
+
+# Certificate files
+*.pem
+*.crt
+*.key
+*.ca-bundle
