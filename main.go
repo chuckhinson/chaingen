@@ -14,32 +14,27 @@ import (
 
 func main() {
 
-	rootCaCertificate, rootCaPrivKey, err := makeRootCaCertificate()
+	serverPrivKey, err := rsa.GenerateKey(rand.Reader, 4096)
 	if err != nil {
 		panic(err)
 	}
 
-	intCaCertificate, intCaPrivKey, err := makeIntCaCertificate(rootCaCertificate, rootCaPrivKey)
+	chain, err := makeCertChain(serverPrivKey.PublicKey)
 	if err != nil {
 		panic(err)
 	}
 
-	serverCertificate, serverPrivKey, err := makeServerCertificate(intCaCertificate, intCaPrivKey)
+	rootCaPEM, err := writeCertPEM(chain[0], "/tmp/capublic.pem")
 	if err != nil {
 		panic(err)
 	}
 
-	rootCaPEM, err := writeCertPEM(rootCaCertificate, "/tmp/capublic.pem")
+	intCaPEM, err := writeCertPEM(chain[1], "/tmp/intpublic.pem")
 	if err != nil {
 		panic(err)
 	}
 
-	intCaPEM, err := writeCertPEM(intCaCertificate, "/tmp/intpublic.pem")
-	if err != nil {
-		panic(err)
-	}
-
-	_, err = writeCertPEM(serverCertificate, "/tmp/serverpublic.pem")
+	_, err = writeCertPEM(chain[2], "/tmp/serverpublic.pem")
 	if err != nil {
 		panic(err)
 	}
@@ -54,6 +49,27 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+
+}
+
+func makeCertChain(serverKey rsa.PublicKey) (chain [][]byte, err error) {
+
+	rootCa, rootCaKey, err := makeRootCaCertificate()
+	if err != nil {
+		return nil, err
+	}
+
+	intCa, intCaKey, err := makeIntCaCertificate(rootCa, rootCaKey)
+	if err != nil {
+		return nil, err
+	}
+
+	serverCert, err := makeServerCertificate(intCa, intCaKey, serverKey)
+	if err != nil {
+		return nil, err
+	}
+
+	return [][]byte{rootCa, intCa, serverCert}, nil
 
 }
 
@@ -157,11 +173,11 @@ func makeIntCaCertificate(rootCaCert []byte, rootCaPrivKey *rsa.PrivateKey) ([]b
 
 }
 
-func makeServerCertificate(caCert []byte, caPrivKey *rsa.PrivateKey) ([]byte, *rsa.PrivateKey, error) {
+func makeServerCertificate(caCert []byte, caPrivKey *rsa.PrivateKey, serverKey rsa.PublicKey) ([]byte, error) {
 
 	caCertTemplate, err := x509.ParseCertificate(caCert)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	// Define CA certificate template
@@ -176,18 +192,12 @@ func makeServerCertificate(caCert []byte, caPrivKey *rsa.PrivateKey) ([]byte, *r
 		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
 		KeyUsage:     x509.KeyUsageDigitalSignature}
 
-	// create our private and public key
-	serverPrivKey, err := rsa.GenerateKey(rand.Reader, 4096)
-	if err != nil {
-		return nil, nil, err
-	}
-
 	// create the CA Certificate
-	serverCertificate, err := x509.CreateCertificate(rand.Reader, serverCertTemplate, caCertTemplate, &serverPrivKey.PublicKey, caPrivKey)
+	serverCertificate, err := x509.CreateCertificate(rand.Reader, serverCertTemplate, caCertTemplate, &serverKey, caPrivKey)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	return serverCertificate, serverPrivKey, nil
+	return serverCertificate, nil
 
 }
