@@ -7,6 +7,8 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
+	"flag"
+	"fmt"
 	"math/big"
 	"os"
 	"time"
@@ -14,12 +16,18 @@ import (
 
 func main() {
 
+	var serverName string
+	flag.StringVar(&serverName, "host", "test.example.com", "hostname for certificate")
+	flag.Parse()
+
+	fmt.Println("host:", serverName)
+
 	serverKey, err := rsa.GenerateKey(rand.Reader, 4096)
 	if err != nil {
 		panic(err)
 	}
 
-	chain, err := makeCertChain("test.example.com", serverKey.PublicKey)
+	chain, err := makeCertChain(serverName, serverKey.PublicKey)
 	if err != nil {
 		panic(err)
 	}
